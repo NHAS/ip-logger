@@ -24,13 +24,17 @@ type Url struct {
 func NewVisit(Identifier, IP string) (err error) {
 	u, err := cache.Get(Identifier)
 	if err != nil {
-		if err := db.Where("identifier = ?", Identifier).First(&u).Error; err != nil {
-			return err
+		if err != ErrCacheMiss {
+			return
+		}
+
+		if err = db.Where("identifier = ?", Identifier).First(&u).Error; err != nil {
+			return
 		}
 	}
 
-	if err := db.Create(&Visit{UrlID: u.ID, IP: IP}).Error; err != nil {
-		return err
+	if err = db.Create(&Visit{UrlID: u.ID, IP: IP}).Error; err != nil {
+		return
 	}
 
 	cache.Refresh(u)

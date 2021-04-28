@@ -13,7 +13,7 @@ import (
 
 const SockAddr = "/tmp/iplogcontrol.sock"
 
-func StartCommandHandler() (err error) {
+func StartCommandHandler(domain string) (err error) {
 	if err = os.RemoveAll(SockAddr); err != nil {
 		log.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func StartCommandHandler() (err error) {
 				log.Fatal("accept error:", err)
 			}
 
-			go runCommands(conn)
+			go runCommands(domain, conn)
 		}
 	}()
 
@@ -66,7 +66,7 @@ func makeCommand(args []string) (c Command, err error) {
 	return c, fmt.Errorf("Unable to create command")
 }
 
-func runCommands(conn net.Conn) {
+func runCommands(domain string, conn net.Conn) {
 	defer conn.Close()
 
 	var cmd Command
@@ -95,7 +95,7 @@ func runCommands(conn net.Conn) {
 				return
 			}
 
-			conn.Write([]byte(id))
+			conn.Write([]byte(domain + "/a/" + id))
 			return
 		}
 

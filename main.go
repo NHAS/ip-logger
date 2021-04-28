@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -32,9 +33,14 @@ func redirectionHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+type config struct {
+	Domain string
+}
+
 func main() {
 
 	listenAddr := flag.String("server", "0.0.0.0:8080", "Server listen address")
+	configPath := flag.String("config", "config.json", "Configuration file for server location")
 
 	flag.Parse()
 
@@ -48,13 +54,23 @@ func main() {
 	})
 
 	if serverMode {
-
-		err := models.OpenDataBase("db.sql")
+		configBytes, err := ioutil.ReadFile(*configPath)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		err = StartCommandHandler()
+		var conf config
+		err = json.Unmarshal(configBytes, &conf)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = models.OpenDataBase("db.sql")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = StartCommandHandler(conf.Domain)
 		if err != nil {
 			log.Fatal(err)
 		}
