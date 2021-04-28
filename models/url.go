@@ -64,7 +64,7 @@ func GetUrl(Iden string) (u Url, err error) {
 		return
 	}
 
-	d := db.First(&u)
+	d := db.Where("identifier = ?", Iden).First(&u)
 	if d.Error != nil {
 		return u, d.Error
 	}
@@ -72,4 +72,23 @@ func GetUrl(Iden string) (u Url, err error) {
 	err = cache.Put(u)
 
 	return
+}
+
+func GetAllUrls() (us []Url, err error) {
+	if err = db.Find(&us).Error; err != nil {
+		return us, err
+	}
+
+	return
+}
+
+func DeleteUrl(Ident string) (err error) {
+	var u Url
+	if err = db.Where("identifier = ?", Ident).Delete(&u).Error; err != nil {
+		return
+	}
+
+	cache.Expire(u)
+
+	return db.Delete(&Visit{}, "url_id = ?", u.ID).Error
 }

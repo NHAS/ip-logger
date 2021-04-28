@@ -12,13 +12,17 @@ var cache *Cache
 func OpenDataBase(path string) (err error) {
 
 	db, err = gorm.Open(sqlite.Open(path), &gorm.Config{})
-	if err != nil {
+	if err == nil {
 		err = db.AutoMigrate(&Url{}, &Visit{})
+		if err != nil {
+			return
+		}
 	}
 
 	var Urls []Url
 	result := db.Find(&Urls)
 	if result.Error != nil {
+
 		return result.Error
 	}
 

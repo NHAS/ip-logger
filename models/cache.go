@@ -9,24 +9,29 @@ var ErrCacheMiss = errors.New("Entry not found in cache")
 var ErrCacheTrample = errors.New("Identity already exists in cache")
 
 type Cache struct {
-	sync.RWMutex
+	lock           sync.RWMutex
 	redirectionMap map[string]Url
+}
+
+func (c *Cache) Fuck() {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 }
 
 func NewCache(urls []Url) (c *Cache) {
 
-	c.redirectionMap = make(map[string]Url, len(urls))
+	rMap := make(map[string]Url, len(urls))
 
 	for i := range urls {
-		c.redirectionMap[urls[i].Identifier] = urls[i]
+		rMap[urls[i].Identifier] = urls[i]
 	}
 
-	return c
+	return &Cache{redirectionMap: rMap}
 }
 
 func (c *Cache) Get(Iden string) (u Url, err error) {
-	c.RLock()
-	defer c.RUnlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	if u, ok := c.redirectionMap[Iden]; ok {
 		return u, nil
 	}
@@ -35,8 +40,9 @@ func (c *Cache) Get(Iden string) (u Url, err error) {
 }
 
 func (c *Cache) Put(u Url) error {
-	c.Lock()
-	defer c.Unlock()
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	if _, ok := c.redirectionMap[u.Identifier]; ok {
 		return ErrCacheTrample
 	}
@@ -47,16 +53,16 @@ func (c *Cache) Put(u Url) error {
 }
 
 func (c *Cache) Refresh(u Url) {
-	c.Lock()
-	defer c.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	c.redirectionMap[u.Identifier] = u
 
 }
 
 func (c *Cache) Expire(u Url) {
-	c.Lock()
-	defer c.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	delete(c.redirectionMap, u.Identifier)
 }

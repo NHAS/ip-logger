@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/NHAS/ip-logger/models"
 	"github.com/NHAS/ip-logger/util"
@@ -30,70 +32,57 @@ func redirectionHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-const SockAddr = "/tmp/iplogcontrol.sock"
-
 func main() {
-	if err := os.RemoveAll(SockAddr); err != nil {
-		log.Fatal(err)
-	}
 
-	err := models.OpenDataBase("db.sql")
-	if err != nil {
-		log.Fatal(err)
-	}
+	listenAddr := flag.String("server", "0.0.0.0:8080", "Server listen address")
 
-	go func() {
-		l, err := net.Listen("unix", SockAddr)
+	flag.Parse()
+
+	serverMode := false
+
+	flag.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "server":
+			serverMode = true
+		}
+	})
+
+	if serverMode {
+
+		err := models.OpenDataBase("db.sql")
 		if err != nil {
-			log.Fatal("listen error:", err)
+			log.Fatal(err)
 		}
-		defer l.Close()
 
-		for {
-			// Accept new connections, dispatching them to echoServer
-			// in a goroutine.
-			conn, err := l.Accept()
-			if err != nil {
-				log.Fatal("accept error:", err)
-			}
-
-			go commands(conn)
+		err = StartCommandHandler()
+		if err != nil {
+			log.Fatal(err)
 		}
-	}()
 
-	http.HandleFunc("/a/", redirectionHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
+		http.HandleFunc("/a/", redirectionHandler)
+		log.Fatal(http.ListenAndServe(*listenAddr, nil))
+	}
 
-func commands(conn net.Conn) {
-	var cmd Command
-	err := json.NewDecoder(conn).Decode(&cmd)
+	c, err := makeCommand(flag.Args())
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 
-	switch cmd.Cmd {
-	case "ls":
-	case "create":
-		label := ""
-		if len(cmd.Args) > 1 {
-			label = cmd.Args[0]
-		}
-
-		if len(cmd.Args) > 0 {
-			id, err := models.NewUrl(cmd.Args[len(cmd.Args)-1], label)
-			if err != nil {
-				return
-			}
-
-			conn.Write([]byte(id))
-		}
-	case "rm":
-
+	conn, err := net.Dial("unix", SockAddr)
+	if err != nil {
+		log.Fatal(err)
 	}
-}
 
-type Command struct {
-	Cmd  string
-	Args []string
+	b, err := json.Marshal(c)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	conn.Write(b)
+
+	re := bufio.NewReader(conn)
+
+	line, _, _ := re.ReadLine()
+
+	fmt.Println(string(line))
 }
