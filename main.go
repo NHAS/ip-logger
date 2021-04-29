@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,22 +14,22 @@ import (
 )
 
 func redirectionHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL.Path)
+
 	u, err := models.GetUrl(util.GetId(r.URL.Path))
 	if err != nil {
-
-		err = models.NewVisit(u.Identifier, r.RemoteAddr)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		http.Redirect(w, r, u.Destination, 302)
-
+		http.NotFound(w, r)
+		log.Println(err)
 		return
 	}
 
-	http.NotFound(w, r)
+	err = models.NewVisit(u.Identifier, r.RemoteAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	return
+	http.Redirect(w, r, u.Destination, 302)
+
 }
 
 type config struct {
@@ -75,7 +74,9 @@ func main() {
 			log.Fatal(err)
 		}
 
+		log.Println("Listening on ", *listenAddr)
 		http.HandleFunc("/a/", redirectionHandler)
+
 		log.Fatal(http.ListenAndServe(*listenAddr, nil))
 	}
 
@@ -86,7 +87,8 @@ func main() {
 
 	conn, err := net.Dial("unix", SockAddr)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Unable to contact server")
+		return
 	}
 
 	b, err := json.Marshal(c)
@@ -96,9 +98,14 @@ func main() {
 
 	conn.Write(b)
 
-	re := bufio.NewReader(conn)
+	for {
+		b := make([]byte, 1)
+		_, err := conn.Read(b)
+		if err != nil {
+			break
+		}
+		fmt.Print(string(b))
+	}
+	fmt.Print("\n")
 
-	line, _, _ := re.ReadLine()
-
-	fmt.Println(string(line))
 }

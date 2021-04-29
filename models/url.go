@@ -1,20 +1,25 @@
 package models
 
 import (
+	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/NHAS/ip-logger/util"
-	"gorm.io/gorm"
 )
 
 type Visit struct {
-	gorm.Model
-	UrlID uint
-	IP    string
+	ID        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	UrlID     uint
+	IP        string
 }
 
 type Url struct {
-	gorm.Model
+	ID          uint `gorm:"primarykey"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 	Destination string
 	Identifier  string `gorm:"unique;not null"`
 	Label       string
@@ -79,7 +84,7 @@ func GetUrl(Iden string) (u Url, err error) {
 }
 
 func GetAllUrls() (us []Url, err error) {
-	if err = db.Find(&us).Error; err != nil {
+	if err = db.Preload("Vists").Find(&us).Error; err != nil {
 		return us, err
 	}
 
@@ -88,8 +93,18 @@ func GetAllUrls() (us []Url, err error) {
 
 func DeleteUrl(Ident string) (err error) {
 	var u Url
-	if err = db.Where("identifier = ?", Ident).Delete(&u).Error; err != nil {
+	tx := db.Where("identifier = ?", Ident).Find(&u)
+	if err = tx.Error; err != nil {
+		return tx.Error
+	}
+
+	tx = db.Delete(&u)
+	if err = tx.Error; err != nil {
 		return
+	}
+
+	if tx.RowsAffected == 0 {
+		return fmt.Errorf("Unknown entry '%s'", Ident)
 	}
 
 	cache.Expire(u)

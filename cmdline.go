@@ -41,26 +41,21 @@ func StartCommandHandler(domain string) (err error) {
 func makeCommand(args []string) (c Command, err error) {
 	if len(args) > 0 {
 
-		switch args[0] {
-		case "ls":
-			c.Cmd = "ls"
-			c.Args = args[1:]
-			return
-		case "rm":
-			c.Cmd = "rm"
-			c.Args = args[1:]
-			return
+		u, err := url.Parse(args[len(args)-1])
+		if err != nil {
+			return c, err
 		}
 
-		_, err = url.Parse(args[len(args)-1])
-		if err == nil {
+		switch u.Scheme {
+		case "http", "https":
 			c.Cmd = "create"
 			c.Args = args
-
+		default:
+			c.Cmd = args[0]
+			c.Args = args[1:]
 		}
 
-		return
-
+		return c, err
 	}
 
 	return c, fmt.Errorf("Unable to create command")
@@ -78,8 +73,16 @@ func runCommands(domain string, conn net.Conn) {
 	switch cmd.Cmd {
 	case "ls":
 		urls, err := models.GetAllUrls()
-		log.Println(err)
-		b, _ := json.MarshalIndent(urls, "", "    ")
+		if err != nil {
+			fmt.Fprintf(conn, "Loading all entries failed: %s", err.Error())
+			return
+		}
+
+		b, err := json.MarshalIndent(&urls, "", "    ")
+		if err != nil {
+			fmt.Fprintf(conn, "Loading all entries failed: %s", err.Error())
+			return
+		}
 		conn.Write(b)
 
 	case "create":
@@ -91,21 +94,32 @@ func runCommands(domain string, conn net.Conn) {
 		if len(cmd.Args) > 0 {
 			id, err := models.NewUrl(cmd.Args[len(cmd.Args)-1], label)
 			if err != nil {
-				conn.Write([]byte(err.Error()))
+				fmt.Fprintf(conn, "Creatng encountered an error %s", err.Error())
 				return
 			}
 
-			conn.Write([]byte(domain + "/a/" + id))
+			fmt.Fprintf(conn, "%s/a/%s", domain, id)
 			return
 		}
+
+		fmt.Fprintf(conn, "Not enough arguments for create")
 
 	case "rm":
 		if len(cmd.Args) != 1 {
-			log.Println("Nothing")
+			conn.Write([]byte("Not enough arguments"))
 			return
 		}
-		models.DeleteUrl(cmd.Args[0])
+		err = models.DeleteUrl(cmd.Args[0])
+		if err != nil {
+			log.Println(err)
+			fmt.Fprintf(conn, "Error deleting %s : %s", cmd.Args[0], err.Error())
+			return
+		}
 
+		fmt.Fprintf(conn, "Deleted %s", cmd.Args[0])
+
+	default:
+		conn.Write([]byte("Unknown command " + cmd.Cmd + "\n"))
 	}
 
 }

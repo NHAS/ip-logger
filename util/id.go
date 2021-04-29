@@ -15,5 +15,9 @@ func GenerateID() (string, error) {
 }
 
 func GetId(URL string) string {
+	if len(URL) < idLength*2 {
+		return ""
+	}
+
 	return URL[len(URL)-idLength*2:]
 }
