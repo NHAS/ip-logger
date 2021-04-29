@@ -72,18 +72,33 @@ func runCommands(domain string, conn net.Conn) {
 
 	switch cmd.Cmd {
 	case "ls":
-		urls, err := models.GetAllUrls()
-		if err != nil {
-			fmt.Fprintf(conn, "Loading all entries failed: %s", err.Error())
-			return
+
+		var urls []models.Url
+
+		if len(cmd.Args) == 0 {
+			urls, err = models.GetAllUrls()
+			if err != nil {
+				fmt.Fprintf(conn, "Loading all entries failed: %s", err.Error())
+				return
+			}
+		} else {
+			u, err := models.GetUrl(cmd.Args[0])
+			if err != nil {
+				fmt.Fprintf(conn, "Loading entry failed: %s", err.Error())
+				return
+			}
+
+			urls = []models.Url{u}
+
 		}
 
 		b, err := json.MarshalIndent(&urls, "", "    ")
 		if err != nil {
-			fmt.Fprintf(conn, "Loading all entries failed: %s", err.Error())
+			fmt.Fprintf(conn, "Marshalling entries failed: %s", err.Error())
 			return
 		}
 		conn.Write(b)
+		return
 
 	case "create":
 		label := ""

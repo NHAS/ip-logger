@@ -11,22 +11,21 @@ import (
 type Visit struct {
 	ID        uint `gorm:"primarykey"`
 	CreatedAt time.Time
-	UpdatedAt time.Time
 	UrlID     uint
 	IP        string
+	UA        string
 }
 
 type Url struct {
 	ID          uint `gorm:"primarykey"`
 	CreatedAt   time.Time
-	UpdatedAt   time.Time
 	Destination string
 	Identifier  string `gorm:"unique;not null"`
 	Label       string
 	Vists       []Visit `gorm:"PRELOAD:true"`
 }
 
-func NewVisit(Identifier, IP string) (err error) {
+func NewVisit(Identifier, IP, UA string) (err error) {
 	u, err := cache.Get(Identifier)
 	if err != nil {
 		if err != ErrCacheMiss {
@@ -38,7 +37,7 @@ func NewVisit(Identifier, IP string) (err error) {
 		}
 	}
 
-	if err = db.Create(&Visit{UrlID: u.ID, IP: IP}).Error; err != nil {
+	if err = db.Create(&Visit{UrlID: u.ID, IP: IP, UA: UA}).Error; err != nil {
 		return
 	}
 

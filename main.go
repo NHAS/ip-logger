@@ -23,7 +23,7 @@ func redirectionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = models.NewVisit(u.Identifier, r.RemoteAddr)
+	err = models.NewVisit(u.Identifier, r.RemoteAddr, r.Header.Get("User-Agent"))
 	if err != nil {
 		log.Fatal(err)
 	}
