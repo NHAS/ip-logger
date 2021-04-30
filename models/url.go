@@ -1,28 +1,47 @@
 package models
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"time"
-
-	"github.com/NHAS/ip-logger/util"
 )
 
 type Visit struct {
-	ID        uint `gorm:"primarykey"`
+	ID        uint      `gorm:"primarykey" json:"-"`
+	UpdatedAt time.Time `json:"-"`
 	CreatedAt time.Time
-	UrlID     uint
+	UrlID     uint `json:"-"`
 	IP        string
 	UA        string
 }
 
 type Url struct {
-	ID          uint `gorm:"primarykey"`
+	ID          uint      `gorm:"primarykey" json:"-"`
+	UpdatedAt   time.Time `json:"-"`
 	CreatedAt   time.Time
 	Destination string
 	Identifier  string `gorm:"unique;not null"`
 	Label       string
 	Vists       []Visit `gorm:"PRELOAD:true"`
+}
+
+const idLength = 5
+
+func GenerateID() (string, error) {
+	rnd := make([]byte, idLength)
+	_, err := rand.Read(rnd)
+
+	return hex.EncodeToString(rnd), err
+}
+
+func GetId(URL string) string {
+	if len(URL) < idLength*2 {
+		return ""
+	}
+
+	return URL[len(URL)-idLength*2:]
 }
 
 func NewVisit(Identifier, IP, UA string) (err error) {
@@ -37,9 +56,13 @@ func NewVisit(Identifier, IP, UA string) (err error) {
 		}
 	}
 
-	if err = db.Create(&Visit{UrlID: u.ID, IP: IP, UA: UA}).Error; err != nil {
+	newVisit := &Visit{UrlID: u.ID, IP: IP, UA: UA}
+
+	if err = db.Create(newVisit).Error; err != nil {
 		return
 	}
+
+	u.Vists = append(u.Vists, *newVisit)
 
 	cache.Refresh(u)
 
@@ -55,7 +78,7 @@ func NewUrl(Dest, Label string) (id string, err error) {
 	var u Url
 	u.Destination = Dest
 	u.Label = Label
-	u.Identifier, err = util.GenerateID()
+	u.Identifier, err = GenerateID()
 	if err != nil {
 		return
 	}
@@ -72,7 +95,7 @@ func GetUrl(Iden string) (u Url, err error) {
 		return
 	}
 
-	d := db.Where("identifier = ?", Iden).First(&u)
+	d := db.Preload("Vists").Where("identifier = ?", Iden).First(&u)
 	if d.Error != nil {
 		return u, d.Error
 	}

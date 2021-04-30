@@ -23,7 +23,7 @@ func OpenDataBase(path string) (err error) {
 	}
 
 	var Urls []Url
-	if err = db.Find(&Urls).Error; err != nil {
+	if err = db.Preload("Vists").Find(&Urls).Error; err != nil {
 		return
 	}
 

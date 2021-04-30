@@ -16,7 +16,7 @@ import (
 func redirectionHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL.Path)
 
-	u, err := models.GetUrl(util.GetId(r.URL.Path))
+	u, err := models.GetUrl(models.GetId(r.URL.Path))
 	if err != nil {
 		http.NotFound(w, r)
 		log.Println(err)
@@ -52,17 +52,18 @@ func main() {
 		}
 	})
 
-	if serverMode {
-		configBytes, err := ioutil.ReadFile(*configPath)
-		if err != nil {
-			log.Fatal(err)
-		}
+	configBytes, err := ioutil.ReadFile(*configPath)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-		var conf config
-		err = json.Unmarshal(configBytes, &conf)
-		if err != nil {
-			log.Fatal(err)
-		}
+	var conf config
+	err = json.Unmarshal(configBytes, &conf)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if serverMode {
 
 		err = models.OpenDataBase("db.sql")
 		if err != nil {
@@ -98,6 +99,23 @@ func main() {
 
 	conn.Write(b)
 
+	switch c.Cmd {
+	case "ls":
+		var u []models.Url
+		json.NewDecoder(conn).Decode(&u)
+
+		util.PrintTable(conf.Domain, u)
+
+		if len(u) == 1 {
+			util.PrintVisits(u[0])
+		}
+	default:
+		printConnection(conn)
+	}
+
+}
+
+func printConnection(conn net.Conn) {
 	for {
 		b := make([]byte, 1)
 		_, err := conn.Read(b)
@@ -107,5 +125,4 @@ func main() {
 		fmt.Print(string(b))
 	}
 	fmt.Print("\n")
-
 }
