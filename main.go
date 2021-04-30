@@ -99,10 +99,17 @@ func main() {
 
 	conn.Write(b)
 
+	buf := get(conn)
+
 	switch c.Cmd {
 	case "ls":
 		var u []models.Url
-		json.NewDecoder(conn).Decode(&u)
+
+		err := json.Unmarshal(buf, &u)
+		if err != nil {
+			fmt.Printf("Error: %s", buf)
+			return
+		}
 
 		util.PrintTable(conf.Domain, u)
 
@@ -110,19 +117,20 @@ func main() {
 			util.PrintVisits(u[0])
 		}
 	default:
-		printConnection(conn)
+		fmt.Printf("%s\n", buf)
 	}
 
 }
 
-func printConnection(conn net.Conn) {
+func get(conn net.Conn) (result []byte) {
 	for {
 		b := make([]byte, 1)
 		_, err := conn.Read(b)
 		if err != nil {
 			break
 		}
-		fmt.Print(string(b))
+		result = append(result, b[0])
 	}
-	fmt.Print("\n")
+
+	return result
 }
